@@ -1,5 +1,5 @@
 import numpy as np
-from tensorflow import keras
+import keras
 import tensorflow as tf
 from sklearn.model_selection import RandomizedSearchCV, train_test_split, GridSearchCV
 import os
@@ -65,9 +65,10 @@ def build_model(n_neurons, n_hidden, learning_rate, input_shape=[12544]):
     for filters in [64] * 2 + [128]:
         strides = 1 if filters == prev_filters else 2
         model.add(ResidualUnit(filters=filters, strides=strides))
+        model.add(keras.layers.Dropout(rate=0.3))
         prev_filters = filters
     
-    model.add(keras.layers.Dropout(rate=0.4))
+    # model.add(keras.layers.Dropout(rate=0.4))
     model.add(keras.layers.GlobalAveragePooling2D())
     model.add(keras.layers.Flatten())
     model.add(keras.layers.Dense(2000, activation='softmax'))
@@ -102,8 +103,9 @@ def search(n_hidden, n_neurons, learning_rate, search_type='g'):
     print(search.best_estimator_.get_params())
 
 # since the training is really time consuming we to continue training whenever we want
-def continue_training(filepath, X_train, y_train, X_valid, y_valid, callbacks, epochs=10, batch_size=2048):
+def continue_training(filepath, X_train, y_train, X_valid, y_valid, callbacks, epochs=10, batch_size=216):
     loaded_model = keras.models.load_model(filepath=filepath, custom_objects={'ResidualUnit': ResidualUnit})
+    print(loaded_model.summary())
     loaded_model.fit(X_train, y_train, validation_data=(X_valid, y_valid), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
 
 
@@ -148,7 +150,7 @@ def preprocess(X, resize=False, rescale=False, reduce_channels=0):
     if reduce_channels:
         X_preprocessed = X_preprocessed[..., :reduce_channels]
     if resize:
-        X_preprocessed = tf.keras.layers.Resizing(height=112, width=112, crop_to_aspect_ratio=True)(X_preprocessed)
+        X_preprocessed = keras.layers.Resizing(height=112, width=112, crop_to_aspect_ratio=True)(X_preprocessed)
     if rescale:
         rescaler = keras.layers.Rescaling(scale=1./255)
         X_preprocessed = rescaler(X_preprocessed)
@@ -160,12 +162,12 @@ if __name__ == '__main__':
     cur_dir = pathlib.Path(__file__).parent.resolve() 
     
     run_log_dir = get_dir()
-    X, y = read_data(filepath=os.path.join(cur_dir, 'encoded_data.tfrecord'), one_class_samples_size=30)
+    X, y = read_data(filepath=os.path.join(cur_dir, 'encoded_data.tfrecord'))
     X = preprocess(X, rescale=True)
     print(X.shape)
-    X_augmented, y_augmented = data_augmentation(X, y)
-    X = tf.concat(values=[X, X_augmented], axis=0)
-    y = tf.concat(values=[y, y_augmented], axis=0)
+    # X_augmented, y_augmented = data_augmentation(X, y)
+    # X = tf.concat(values=[X, X_augmented], axis=0)
+    # y = tf.concat(values=[y, y_augmented], axis=0)
     print(X.shape, y.shape)
     X = X._numpy()
     y = y._numpy()
@@ -174,7 +176,7 @@ if __name__ == '__main__':
     X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train, train_size=0.75, random_state=0)
 
     # creating callbacks
-    checkpoint_cb = keras.callbacks.ModelCheckpoint(filepath='models/one_channel_without_two_convs_two_ru.keras')
+    checkpoint_cb = keras.callbacks.ModelCheckpoint(filepath='models/one_channel_with_two_convs_two_ru_dropout_after_each_ru.keras')
     early_stop_cb = keras.callbacks.EarlyStopping(patience=10)
     tb_cb = keras.callbacks.TensorBoard(log_dir=run_log_dir)
     ratio_cb = RatioCallback()
@@ -182,4 +184,4 @@ if __name__ == '__main__':
     callbacks = [checkpoint_cb, ratio_cb, learning_sch, tb_cb, early_stop_cb]
     
     # search(n_hidden=[3, 4], n_neurons=[5000, 6000], learning_rate=[0.001, 0.0001])
-    continue_training('models/one_channel_without_two_convs_two_ru.keras', X_train, y_train, X_valid, y_valid, callbacks)
+    continue_training('models/one_channel_with_two_convs_two_ru_dropout_after_each_ru.keras', X_train, y_train, X_valid, y_valid, callbacks, epochs=30)
