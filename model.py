@@ -102,8 +102,8 @@ def search(n_hidden, n_neurons, learning_rate, search_type='g'):
     search.fit(X_train, y_train, validation_data=(X_valid, y_valid), epochs=100, batch_size=216)
     print(search.best_estimator_.get_params())
 
-# since the training is really time consuming we to continue training whenever we want
-def continue_training(filepath, X_train, y_train, X_valid, y_valid, callbacks, epochs=10, batch_size=216):
+# since the training is really time consuming we need to continue training whenever we want
+def continue_training(filepath, X_train, y_train, X_valid, y_valid, callbacks, epochs=20, batch_size=256):
     loaded_model = keras.models.load_model(filepath=filepath, custom_objects={'ResidualUnit': ResidualUnit})
     print(loaded_model.summary())
     loaded_model.fit(X_train, y_train, validation_data=(X_valid, y_valid), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
@@ -174,6 +174,7 @@ if __name__ == '__main__':
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=0)
     X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train, train_size=0.75, random_state=0)
+    print(X_valid)
 
     # creating callbacks
     checkpoint_cb = keras.callbacks.ModelCheckpoint(filepath='models/one_channel_with_two_convs_two_ru_dropout_after_each_ru.keras')
@@ -182,6 +183,6 @@ if __name__ == '__main__':
     ratio_cb = RatioCallback()
     learning_sch = keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=5)
     callbacks = [checkpoint_cb, ratio_cb, learning_sch, tb_cb, early_stop_cb]
-    
+    test_pretrained('models/one_channel_with_two_convs_two_ru_dropout_after_each_ru.keras', X_test, y_test)
     # search(n_hidden=[3, 4], n_neurons=[5000, 6000], learning_rate=[0.001, 0.0001])
-    continue_training('models/one_channel_with_two_convs_two_ru_dropout_after_each_ru.keras', X_train, y_train, X_valid, y_valid, callbacks, epochs=30)
+    # continue_training('models/one_channel_with_two_convs_two_ru_dropout_after_each_ru.keras', X_train, y_train, X_valid, y_valid, callbacks, epochs=30)
